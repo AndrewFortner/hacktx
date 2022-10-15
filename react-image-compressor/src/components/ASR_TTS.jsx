@@ -4,10 +4,8 @@ import axios from 'axios'
 
 export default class imageCompressor extends React.Component {
   uploadAction() {
-    var filedata = document.querySelector('input[type="file"]').files[0]
-    this.state.data.append("file", filedata)
-    this.state.data.append("sr", 16000)
-    this.state.data.append("in_lang", this.state.language)
+    this.state.data.append("text", this.state.text)
+    this.state.data.append("out_lang", this.state.language)
   }
   constructor() {
     super();
@@ -23,12 +21,12 @@ export default class imageCompressor extends React.Component {
       file : "",
       inputText : "",
       language: "",
+      input_language: "",
       data: new FormData()
     };
   }
 
   handle = e => {
-    this.uploadAction()
     this.setState({
       file : e.target.value
     });
@@ -47,13 +45,11 @@ export default class imageCompressor extends React.Component {
 
    clickASR = async e => {
     e.preventDefault();
-    const link = "http://0.0.0.0:8000/transcribe-file-multilingual"
+    const link = "http://0.0.0.0:8000/asr-live-en-zh"
     let t = ""
     await axios({
-      method: "post",
+      method: "get",
       url: link,
-      data: this.state.data,
-      headers: { "Content-Type": "multipart/form-data" },
     })
       .then(function (response) {
         //handle success
@@ -68,26 +64,23 @@ export default class imageCompressor extends React.Component {
     e.preventDefault(); 
     this.setState({data: new FormData()})
     this.state.data.append("text", this.state.inputText)
-    let link = this.state.language == "en" ? "http://127.0.0.1:8000/transcribe-file" : "http://127.0.0.1:8000/transcribe-file-multilingual"
+    this.state.data.append("out_lang", this.state.language)
+    let link = "http://127.0.0.1:8000/translate-text"
     let r
+    let t
     await axios({
       method: "post",
-      responseType: 'blob',
+      responseType: 'text',
       url: link,
       data: this.state.data,
       headers: { "Content-Type": "multipart/form-data" },
     })
       .then(function (response) {
         //handle success
-        console.log(response)
-        r = response.data
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', 'file.wav'); //or any other extension
-        document.body.appendChild(link);
-        link.click();
+        console.log(response.data.text.text)
+        t = response.data.text.text
       })
+      this.setState({outputText: t, clickedASR: true})
     return 1;
   };
 
@@ -97,7 +90,7 @@ export default class imageCompressor extends React.Component {
     let languages 
   languages = [
     { label: "English", value: 1 },
-    { label: "German", value: 2 },
+    { label: "Chinese", value: 2 },
     { label : "Spanish", value: 3}
   ];
     return (

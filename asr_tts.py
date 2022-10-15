@@ -42,24 +42,6 @@ output = []
 num_starts = 0
 
 app = FastAPI()
-#English audio file into English text
-@app.post("/transcribe-file")
-async def transcribe(file: UploadFile, sr: int = Form()):
-    data = io.BytesIO(await file.read())
-    return {"text": process_wav(data, sr, "en_XX")}
-
-#English audio file into out_lang text
-@app.post("/transcribe-file-translate")
-async def translate_transcription(file: UploadFile, sr: int = Form(), out_lang: str = Form()):
-    data = io.BytesIO(await file.read())
-    output = process_wav(data, sr, out_lang)
-    print(output)
-    return {"text": output}
-
-@app.post("/transcribe-file-en-de")
-async def translate_transcription(file: UploadFile, sr: int = Form()):
-    data = io.BytesIO(await file.read())
-    return {"text": process_wav(data, sr, "de_DE")}
 
 #English speech into out_lang text
 @app.post("/asr-live-translate")
@@ -85,7 +67,7 @@ def begin():
     global end
     global num_starts
     num_starts += 1
-    TRANSLATE_LANG = "zh_CN"
+    TRANSLATE_LANG = "en_XX"
     if num_starts % 2 == 1:
         end = False
         listening = threading.Thread(target = listen)
@@ -94,14 +76,14 @@ def begin():
         end = True
         return {"text": toString(output)}
 
-@app.get("/asr-live-en-de")
+@app.get("/asr-live-en-zh")
 def begin():
     #Start script
     global TRANSLATE_LANG
     global end
     global num_starts
     num_starts += 1
-    TRANSLATE_LANG = "de_DE"
+    TRANSLATE_LANG = "zh_CN"
     if num_starts % 2 == 1:
         end = False
         listening = threading.Thread(target = listen)
@@ -139,39 +121,15 @@ def synthesize(text : str = Form()):
     audio.seek(0)
     return StreamingResponse(audio, media_type = "audio/wav")
 
-@app.post("/tts-en-to-de")
-def tts_en_to_es(text : str = Form()):
-    #Translate
-    in_lang = "en_XX"
-    out_lang = "de_DE"
-    translation_tokenizer.src_lang = in_lang
+@app.post("/translate-text")
+def translate_text(text : str = Form(), out_lang: str = Form()):
+    translation_tokenizer.src_lang = 'en_XX'
+    text = text.replace('.', ',')
     encode = translation_tokenizer(text, return_tensors = "pt")
     tokens = translation_model.generate(**encode, forced_bos_token_id=translation_tokenizer.lang_code_to_id[out_lang])
     text = translation_tokenizer.batch_decode(tokens, skip_special_tokens=True)
-    #TTS
-    TTSHubInterface.update_cfg_with_data_cfg(cfg, task.data_cfg)
-    generator = task.build_generator(models, cfg)
-    sample = TTSHubInterface.get_model_input(task, text)
-    wav, rate = TTSHubInterface.get_prediction(task, models[0], generator, sample)
-    audio = io.BytesIO()
-    soundfile.write(audio, wav, rate, format = "WAV")
-    audio.seek(0)
-    return StreamingResponse(audio, media_type = "audio/wav")
-
-#ASR of file
-def process_wav(data, sample_rate, out_lang):
-    audio, rate = librosa.load(data, sr = sample_rate)
-    input_values = tokenizer(audio, sampling_rate = rate, return_tensors = "pt").input_values
-    logits = model(input_values).logits
-    prediction = torch.argmax(logits, dim = -1)
-    text = tokenizer.batch_decode(prediction)[0].lower()
-    if(out_lang == 'en_XX'):
-        return text
-    translation_tokenizer.src_lang = 'en_XX'
-    encode = translation_tokenizer(text, return_tensors = "pt")
-    tokens = translation_model.generate(**encode, forced_bos_token_id=translation_tokenizer.lang_code_to_id[out_lang])
-    translated = translation_tokenizer.batch_decode(tokens, skip_special_tokens=True)
-    return translated
+    print(text)
+    return {"text": text}
 
 #ASR of microphone
 def process(data, thread_number):
